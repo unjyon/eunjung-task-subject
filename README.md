@@ -119,7 +119,7 @@ make clean
 ## 과제 repo 구조
 
 ```
-42tape-frontend-assignment/
+frontend-assignment/
 ├── README.md              # 전체 과제 개요 및 실행 방법
 ├── Makefile               # 로컬 실행 방법 제공
 ├── task1-upload-queue/
