@@ -236,3 +236,265 @@ run3:
 - [ ] (과제 2) 5,000개 이상의 항목이 부드럽게 스크롤되나요?
 - [ ] (과제 3) 브라우저 새로고침 후 업로드가 재개되나요?
 - [ ] 에러 상황에 대한 처리가 되어 있나요?
+
+# 프로젝트 개요 (프론트엔드 기준)
+
+## 📋 프로젝트 소개
+
+이 프로젝트는 **PHP 기반의 서버 사이드 렌더링(SSR) 웹 애플리케이션**입니다. 프론트엔드는 서버에서 HTML을 생성하여 클라이언트에 전달하는 전통적인 방식으로 동작하며, HTMX를 활용한 부분적 비동기 업데이트를 지원합니다.
+
+## 🏗️ 아키텍처 개요
+
+### 전체 구조
+```
+프론트엔드 요청 → PHP 서버 (Limepie 프레임워크)
+                ↓
+         템플릿 엔진 (.tpl 파일)
+                ↓
+         HTML + CSS + JavaScript
+                ↓
+         클라이언트 브라우저
+```
+
+### 주요 특징
+- **서버 사이드 렌더링**: 모든 HTML은 서버에서 PHP 템플릿으로 생성됩니다
+- **템플릿 기반**: `.tpl` 파일을 사용하여 뷰를 구성합니다
+- **모듈화된 구조**: 테마별, 모듈별로 파일이 분리되어 있습니다
+- **HTMX 통신**: 페이지 전체 리로드 없이 부분 업데이트를 지원합니다
+
+## 📁 디렉토리 구조 (프론트엔드 관점)
+
+### 핵심 디렉토리
+
+```
+app/
+├── View/                    # 템플릿 파일들 (.tpl)
+│   ├── Layout/             # 레이아웃 템플릿
+│   ├── Module/             # 모듈별 템플릿
+│   ├── Parts/              # 재사용 가능한 컴포넌트
+│   │   └── Layout/
+│   │       └── Front/
+│   │           ├── Head.tpl    # HTML <head> 부분
+│   │           └── Foot.tpl    # HTML <body> 끝 부분
+│   └── Content/            # 콘텐츠 템플릿
+│
+document/web/               # 웹 루트 디렉토리
+├── index.php               # 프론트엔드 진입점
+└── assets/                 # 정적 리소스 (CSS, JS, 이미지 등)
+    ├── development/        # 개발용 소스 파일
+    │   ├── common/        # 공통 스크립트/스타일
+    │   ├── library/       # 외부 라이브러리
+    │   ├── vendor/        # 써드파티 라이브러리
+    │   └── service/       # 서비스별 리소스
+    ├── dist/              # 빌드된 최적화 파일
+    └── theme/             # 테마별 리소스
+        ├── control/       # 관리자 테마
+        ├── powderroom/    # 파우더룸 테마
+        └── caniid/        # 캐니드 테마
+```
+
+## 🛠️ 기술 스택
+
+### 프론트엔드 라이브러리
+
+| 라이브러리 | 버전 | 용도 |
+|-----------|------|------|
+| **jQuery** | 3.7.1 | DOM 조작 및 이벤트 처리 |
+| **Bootstrap** | 5.2.0 | UI 프레임워크 (그리드, 컴포넌트) |
+| **HTMX** | 2.0.4 | 비동기 통신 및 부분 DOM 업데이트 |
+| **Pretendard** | 1.3.6 | 웹폰트 |
+
+### 추가 라이브러리
+- **Select2** (4.0.13): 고급 셀렉트 박스
+- **Tagify** (4.27.0): 태그 입력 컴포넌트
+- **Choices.js** (11.0.3): 커스텀 셀렉트/체크박스
+- **Sortable** (1.15.6): 드래그 앤 드롭 정렬
+- **Swiper** (11.2.8): 슬라이더/캐러셀
+- **TinyMCE** (0.95): 리치 텍스트 에디터
+
+## 📝 템플릿 문법
+
+이 프로젝트는 커스텀 템플릿 문법을 사용합니다.
+
+### 변수 출력
+```html
+<!-- 단순 변수 출력 -->
+<div>{=payload.brand.name}</div>
+
+<!-- 이미지 URL -->
+<img src="{=payload.brand.logo_url}" alt="" />
+```
+
+### 조건문
+```html
+{?payload.brand.description ?? false}
+    <p class="desc">{=payload.brand.description}</p>
+{/}
+```
+
+### 반복문
+```html
+{@review = payload.reviews}
+    <li class="review">
+        <span>{=review.title}</span>
+    </li>
+{/}
+```
+
+### HTMX 속성 사용
+```html
+<a 
+    hx-get="/brand/{=payload.brand.seq}"
+    hx-target="#limepie-contents"
+    hx-push-url="true"
+    hx-swap="innerHTML show:window:top"
+>
+    브랜드 보기
+</a>
+```
+
+## 🎨 테마 시스템
+
+프로젝트는 **다중 테마 시스템**을 지원합니다:
+
+- **Control**: 관리자/대시보드 테마
+- **Powderroom**: 파우더룸 서비스 테마
+- **Caniid**: 캐니드 서비스 테마
+
+각 테마는 독립적인 CSS, JavaScript 파일을 가지고 있으며, `document/web/assets/theme/` 디렉토리 하위에 위치합니다.
+
+## 🔨 빌드 프로세스
+
+### 에셋 빌드
+프론트엔드 리소스는 **bash 스크립트**를 통해 빌드됩니다:
+
+```bash
+# 전체 빌드
+./script/build.sh
+
+# 개별 테마 빌드
+./script/assets/control-minify.sh      # Control 테마
+./script/assets/powderroom-minify.sh   # Powderroom 테마
+```
+
+### 빌드 과정
+1. **개발 파일 수집**: `development/` 디렉토리의 소스 파일들을 수집
+2. **압축(Minify)**: JavaScript/CSS 파일을 압축하여 용량 최적화
+3. **버전 관리**: 빌드된 파일에 버전 번호를 부여하여 캐시 관리
+4. **배포**: `dist/theme/{테마명}/` 디렉토리에 배포
+
+## 🚀 개발 워크플로우
+
+### 1. 템플릿 파일 수정
+```bash
+# 예: 브랜드 아이템 템플릿 수정
+app/View/Module/Max/Section/Powderroom/Brand/BrandStyle1/Item.tpl
+```
+
+### 2. 스타일 수정
+```bash
+# 테마별 CSS 파일 수정
+document/web/assets/theme/powderroom/styles/common.css
+document/web/assets/theme/powderroom/styles/theme/design.css
+```
+
+### 3. JavaScript 수정
+```bash
+# 공통 스크립트
+document/web/assets/development/common/js/common.js
+
+# 테마별 스크립트
+document/web/assets/theme/powderroom/js/custom.js
+```
+
+### 4. 빌드 및 배포
+```bash
+# 변경사항 빌드
+./script/build.sh
+
+# 또는 특정 테마만 빌드
+./script/assets/powderroom-minify.sh
+```
+
+## 🔍 주요 파일 설명
+
+### 진입점
+- **`document/web/index.php`**: 웹 애플리케이션의 진입점. 모든 HTTP 요청이 이 파일을 통해 처리됩니다.
+
+### 레이아웃 파일
+- **`app/View/Parts/Layout/Front/Head.tpl`**: 모든 페이지의 `<head>` 섹션을 담당합니다.
+  - 메타 태그 설정
+  - 외부 라이브러리 로드 (jQuery, Bootstrap, Pretendard)
+  - 공통 CSS/JS 파일 로드
+- **`app/View/Parts/Layout/Front/Foot.tpl`**: 모든 페이지의 `<body>` 끝 부분을 담당합니다.
+  - Bootstrap JavaScript 로드
+  - Popover 초기화 스크립트
+
+### 에셋 로더
+- **`resource/Asset/Control.php`**: Control 테마의 에셋 로딩을 관리하는 PHP 클래스
+- **`resource/Asset/Powderroom.php`**: Powderroom 테마의 에셋 로딩을 관리하는 PHP 클래스
+
+## 🌐 HTMX 사용 패턴
+
+이 프로젝트는 HTMX를 활용하여 SPA와 유사한 사용자 경험을 제공합니다.
+
+### 기본 패턴
+```html
+<!-- 링크 클릭 시 부분 업데이트 -->
+<a 
+    hx-get="/review/{=review.seq}"
+    hx-target="#limepie-contents"
+    hx-push-url="true"
+    hx-swap="innerHTML show:window:top"
+>
+    리뷰 보기
+</a>
+```
+
+### 주요 HTMX 속성
+- **`hx-get`**: GET 요청으로 데이터 가져오기
+- **`hx-target`**: 업데이트할 DOM 요소 선택자
+- **`hx-push-url`**: 브라우저 히스토리에 URL 추가
+- **`hx-swap`**: 콘텐츠 교체 방식 지정
+
+## 📦 에셋 관리
+
+### 개발 파일 위치
+- **소스 파일**: `document/web/assets/development/`
+- **빌드 결과물**: `document/web/assets/dist/theme/{테마명}/`
+
+### 버전 관리
+빌드된 파일은 자동으로 버전 번호가 부여되며, 이전 버전은 자동으로 정리됩니다 (최신 3개 버전만 유지).
+
+### 캐시 무효화
+템플릿에서 에셋을 로드할 때 쿼리 파라미터로 타임스탬프를 추가하여 캐시를 무효화합니다:
+```html
+<link rel="stylesheet" href="{=links.assets_url}/theme/caniid/styles/common.css?time={=time()}" />
+```
+
+## 🎯 프론트엔드 개발 시 주의사항
+
+1. **템플릿 문법**: PHP 템플릿 문법(`{=}`, `{?}`, `{@}`)을 정확히 사용해야 합니다.
+2. **HTMX 의존성**: 비동기 업데이트가 필요한 경우 HTMX 속성을 사용합니다.
+3. **테마 분리**: 테마별로 리소스가 분리되어 있으므로, 수정 시 올바른 테마 파일을 수정해야 합니다.
+4. **빌드 필수**: CSS/JS 파일을 수정한 후에는 반드시 빌드 스크립트를 실행해야 합니다.
+5. **jQuery 의존성**: 많은 코드가 jQuery에 의존하므로, 순수 JavaScript로 변경 시 주의가 필요합니다.
+
+## 🔗 관련 리소스
+
+- **프레임워크**: Limepie (PHP 프레임워크)
+- **템플릿 엔진**: 커스텀 템플릿 시스템
+- **에셋 빌더**: Bash 스크립트 기반 minify 시스템
+
+## 📚 추가 학습 자료
+
+프론트엔드 개발을 시작하려면 다음을 이해하는 것이 도움이 됩니다:
+- PHP 템플릿 시스템
+- HTMX 공식 문서: https://htmx.org/
+- Bootstrap 5 문서: https://getbootstrap.com/
+- jQuery API: https://api.jquery.com/
+
+---
+
+**참고**: 이 프로젝트는 서버 사이드 렌더링 방식이므로, React나 Vue 같은 클라이언트 사이드 프레임워크를 사용하지 않습니다. 대신 HTMX를 활용하여 부분적 비동기 업데이트를 구현합니다.
+
