@@ -237,6 +237,16 @@ run3:
 - [ ] (과제 3) 브라우저 새로고침 후 업로드가 재개되나요?
 - [ ] 에러 상황에 대한 처리가 되어 있나요?
 
+
+
+
+
+------
+
+
+
+
+
 # 프로젝트 개요 (프론트엔드 기준)
 
 ## 📋 프로젝트 소개
@@ -314,7 +324,7 @@ document/web/               # 웹 루트 디렉토리
 
 ## 📝 템플릿 문법
 
-이 프로젝트는 커스텀 템플릿 문법을 사용합니다.
+이 프로젝트는 커스텀 템플릿 문법을 사용합니다. 자체 개발 프레임워크의 템플릿 엔진으로 서버 사이드에서 HTML을 생성합니다.
 
 ### 변수 출력
 ```html
@@ -323,22 +333,62 @@ document/web/               # 웹 루트 디렉토리
 
 <!-- 이미지 URL -->
 <img src="{=payload.brand.logo_url}" alt="" />
+
+<!-- 중첩된 객체 접근 -->
+<span>{=payload.user.profile.email}</span>
 ```
 
 ### 조건문
 ```html
+<!-- 기본 조건문 -->
 {?payload.brand.description ?? false}
     <p class="desc">{=payload.brand.description}</p>
 {/}
+
+<!-- if-else 문 -->
+{?user.isLoggedIn}
+    <p>환영합니다, {=user.name}님!</p>
+{:?user.isGuest}
+    <p>게스트 사용자입니다.</p>
+{:}
+    <p>로그인이 필요합니다.</p>
+{/}
 ```
+
+**조건문 문법 요약:**
+- `{?condition}`: if 문 시작
+- `{:?condition}`: elseif 문
+- `{:}`: else 문
+- `{/}`: 조건문 종료
 
 ### 반복문
 ```html
+<!-- 배열 반복 -->
 {@review = payload.reviews}
     <li class="review">
         <span>{=review.title}</span>
+        <p>{=review.content}</p>
     </li>
 {/}
+
+<!-- 중첩 반복문 -->
+{@category = payload.categories}
+    <div class="category">
+        <h3>{=category.name}</h3>
+        {@item = category.items}
+            <div class="item">{=item.name}</div>
+        {/}
+    </div>
+{/}
+```
+
+### 디버깅
+```html
+<!-- 전체 페이로드 데이터 확인 -->
+{print_r(payload)}
+
+<!-- 특정 데이터 출력 -->
+{=payload.deals}
 ```
 
 ### HTMX 속성 사용
@@ -352,6 +402,18 @@ document/web/               # 웹 루트 디렉토리
     브랜드 보기
 </a>
 ```
+
+### 템플릿 문법 요약표
+
+| 문법 | 설명 | 예시 |
+|------|------|------|
+| `{=variable}` | 변수 출력 | `{=payload.title}` |
+| `{?condition}` | 조건문 시작 | `{?user.isAdmin}` |
+| `{:?condition}` | elseif | `{:?user.isGuest}` |
+| `{:}` | else | `{:}` |
+| `{/}` | 블록 종료 | `{/}` |
+| `{@item = array}` | 반복문 | `{@review = payload.reviews}` |
+| `{print_r(data)}` | 디버깅 출력 | `{print_r(payload)}` |
 
 ## 🎨 테마 시스템
 
@@ -383,12 +445,92 @@ document/web/               # 웹 루트 디렉토리
 3. **버전 관리**: 빌드된 파일에 버전 번호를 부여하여 캐시 관리
 4. **배포**: `dist/theme/{테마명}/` 디렉토리에 배포
 
+## 🔄 요청 처리 플로우
+
+프론트엔드 요청이 어떻게 처리되는지 이해하는 것이 중요합니다.
+
+### 전체 플로우
+```
+1. HTTP Request
+    ↓
+2. document/web/index.php (단일 진입점)
+    ↓
+3. app/Controller/AppFrontSide/Route/Rule.php (최초 실행)
+    ├── 환경 설정 주입
+    ├── 인증/권한 검사
+    └── URL 패턴 분석
+    ↓
+4. 모듈별 Rule.php 호출
+    예: resource/Module/Max/Shop/Controller/AppFrontSide/Controller/ProductCosmetic/Route/Rule.php
+    ↓
+5. 정규식 룰 매칭
+    ↓
+6. 해당 Controller 실행
+    예: resource/Module/Max/Shop/Controller/AppFrontSide/Controller/ProductCosmetic/Controller/IndexFromGet.php
+    ├── 비즈니스 로직 처리
+    ├── 템플릿 배열 정의 ($template)
+    ├── 페이로드 데이터 구성 ($payload)
+    └── response->template($template)->meta($meta)->payload($payload) 리턴
+    ↓
+7. 템플릿 엔진에서 렌더링
+    ├── 예) app/View/Layout/PowderroomMenu/Layout.tpl (전체 레이아웃)
+    └── 예) app/View/Module/Max/Board/PowderroomNotice/ListItem.tpl (반복 항목)
+    ↓
+8. Accept 헤더에 따른 응답 (HTML/JSON)
+```
+
+### 컨트롤러에서 템플릿 정의하기
+
+컨트롤러에서 템플릿과 데이터를 정의하여 뷰를 렌더링합니다.
+
+**예시: 상품 목록 컨트롤러**
+```php
+// resource/Module/Max/Shop/Controller/AppFrontSide/Controller/ProductCosmetic/Controller/IndexFromGet.php
+
+// 템플릿 파일 경로 정의
+$template = [
+    'layout'    => parent::getLayoutDir() . '/Layout.tpl',  // 전체 레이아웃
+    'contents'  => parent::getThemeDir() . '/ProductCosmetic/List.tpl',  // 메인 콘텐츠
+    'list_item' => parent::getThemeDir() . '/ProductCosmetic/ListItem.tpl',  // 리스트 항목 (반복용)
+];
+
+// 템플릿에 전달할 데이터 구성
+$payload = [
+    'deals' => $productModels?->toArray(function ($data) {
+        foreach ($data as &$row) {
+            if ($row['id'] ?? false) {
+                $row['id'] = \rawurlencode($row['id']);
+            } else {
+                $row['id'] = $row['seq'];
+            }
+        }
+        return $data;
+    }),
+    'stickers'      => (new StickerModel())($slave1)->getsByServiceSeq(Di::getServiceModel()->getSeq()),
+    'category'      => $categoryItemDataset,
+    'categories'    => $categoryItemModels?->toArray(),
+    'pagination'    => $pagination,
+    'next_page'     => ($_REQUEST['page'] ?? 1) + 1,
+];
+
+// 응답 객체 반환
+return $response->template($template)->meta($meta)->payload($payload);
+```
+
+**템플릿 파일 구조:**
+- **`layout`**: 전체 페이지 레이아웃 템플릿 (헤더, 푸터 포함)
+- **`contents`**: 메인 컨텐츠 템플릿
+- **`list_item`**: 리스트 항목별 템플릿 (반복 렌더링용)
+
 ## 🚀 개발 워크플로우
 
 ### 1. 템플릿 파일 수정
 ```bash
 # 예: 브랜드 아이템 템플릿 수정
 app/View/Module/Max/Section/Powderroom/Brand/BrandStyle1/Item.tpl
+
+# 레이아웃 템플릿 수정
+app/View/Layout/PowderroomMenu/Layout.tpl
 ```
 
 ### 2. 스타일 수정
@@ -416,10 +558,115 @@ document/web/assets/theme/powderroom/js/custom.js
 ./script/assets/powderroom-minify.sh
 ```
 
+## 🗺️ 라우팅 시스템
+
+이 프로젝트는 **정규식 기반 라우팅 시스템**을 사용합니다.
+
+### 라우팅 구조
+
+#### 전역 라우터
+- **파일**: `app/Controller/AppFrontSide/Route/Rule.php`
+- **역할**: 모든 요청의 최초 진입점
+- **기능**: 
+  - 환경 설정 주입
+  - 공통 로직 처리 (인증, 권한 검사)
+  - URL 패턴 분석 후 해당 모듈로 라우팅
+
+#### 모듈별 라우터
+- **위치**: `resource/Module/[Module]/Controller/AppFrontSide/Controller/[Feature]/Route/Rule.php`
+- **예시**: `resource/Module/Max/Shop/Controller/AppFrontSide/Controller/ProductCosmetic/Route/Rule.php`
+- **기능**:
+  - 모듈별 세부 라우팅 규칙
+  - 정규식 패턴으로 Controller 매핑
+  - 비즈니스 로직과 분리된 라우팅 계층
+
+### 라우팅 특징
+- **계층적 구조**: 전역 Rule.php → 모듈별 Rule.php → Controller
+- **정규식 매칭**: URL 패턴을 정규식으로 매칭하여 액션 결정
+- **{next} 매핑**: 하위 폴더로 추가 매핑 가능
+
+## 📋 인터페이스 정의서 (YAML)
+
+이 프로젝트는 **ERD 대신 YAML 인터페이스 정의서**를 통해 데이터 구조와 폼을 정의합니다.
+
+### 정의서 파일 위치
+- **프론트엔드**: `resource/Module/[Module]/Controller/AppFrontSide/Controller/[Feature]/Spec/`
+- **관리자**: `resource/Module/[Module]/Controller/AppFrontSide/Controller/Control/Controller/[Feature]/Spec/`
+
+### YAML 인터페이스 정의 예시
+
+**파일**: `resource/Module/Max/Shop/Controller/AppFrontSide/Controller/Control/Controller/ProductCosmetic/Spec/Create.yml`
+
+```yaml
+type: group
+name: common
+action:
+method: post
+buttons:
+    - type: submit
+      name: __submitted__
+      value: "go"
+      class: btn-submit
+      text: "저장"
+    - type: a
+      href: ../
+      class: btn-list float-end
+      text: "리스트로"
+
+properties:
+    common:
+        label: 기본설정
+        type: group
+        class: row gx-1
+        properties:
+            is_close:
+                label: 노출여부
+                type: choice
+                default: 0
+                items:
+                    0: 노출
+                    1: 비노출
+                    9: 삭제
+            name:
+                label:
+                    ko: 상품 명
+                type: text
+                prepend: "<span class='lang-code'>KO</span>"
+                lang: append
+                rules:
+                    minlength: 2
+                    maxlength: 191
+                    required: true
+                messages:
+                    ko:
+                        maxlength: "{0}자로 입력"
+            id:
+                label:
+                    ko: KR상품번호
+                description: 상품의 고유 코드를 입력하세요.
+                type: text
+                rules:
+                    minlength: 2
+                    maxlength: 45
+                    match: '[0-9a-zA-Z_\-]{1,44}'
+```
+
+### 인터페이스 정의서 구조 요소
+- **`type`**: 폼 타입 (group, text, choice 등)
+- **`name`**: 필드명
+- **`action/method`**: 폼 액션 및 메소드
+- **`buttons`**: 폼 버튼 정의
+- **`properties`**: 필드 속성 정의
+- **`rules`**: 유효성 검증 규칙
+- **`messages`**: 다국어 메시지
+
+**⚠️ 중요**: 데이터 구조를 확인할 때는 ERD 대신 **각 모듈의 Spec 폴더 내 YAML 인터페이스 정의서**를 우선 참조하세요.
+
 ## 🔍 주요 파일 설명
 
 ### 진입점
-- **`document/web/index.php`**: 웹 애플리케이션의 진입점. 모든 HTTP 요청이 이 파일을 통해 처리됩니다.
+- **`document/web/index.php`**: 웹 애플리케이션의 단일 진입점. 모든 HTTP 요청이 이 파일을 통해 처리됩니다.
+- **`document/web/healthcheck.php`**: 헬스체크 엔드포인트
 
 ### 레이아웃 파일
 - **`app/View/Parts/Layout/Front/Head.tpl`**: 모든 페이지의 `<head>` 섹션을 담당합니다.
@@ -433,6 +680,28 @@ document/web/assets/theme/powderroom/js/custom.js
 ### 에셋 로더
 - **`resource/Asset/Control.php`**: Control 테마의 에셋 로딩을 관리하는 PHP 클래스
 - **`resource/Asset/Powderroom.php`**: Powderroom 테마의 에셋 로딩을 관리하는 PHP 클래스
+
+### 모듈 구조
+```
+resource/Module/
+└── Max/Shop/                    # 예시: 쇼핑몰 모듈
+    └── Controller/
+        └── AppFrontSide/
+            └── Controller/
+                ├── ProductCosmetic/        # 프론트엔드 컨트롤러
+                │   ├── Route/Rule.php      # 모듈별 라우팅
+                │   ├── Controller/         # 실제 비즈니스 로직
+                │   │   └── IndexFromGet.php
+                │   └── Spec/               # 인터페이스 정의서
+                └── Control/                # 관리자 시스템
+                    └── Controller/
+                        └── ProductCosmetic/
+                            ├── Route/Rule.php      # 관리자 라우팅
+                            ├── Controller/         # 관리자 비즈니스 로직
+                            │   └── CreateFromPost.php
+                            └── Spec/               # 관리자 인터페이스 정의서
+                                └── Create.yml      # 상품 입력 스펙
+```
 
 ## 🌐 HTMX 사용 패턴
 
@@ -472,6 +741,41 @@ document/web/assets/theme/powderroom/js/custom.js
 <link rel="stylesheet" href="{=links.assets_url}/theme/caniid/styles/common.css?time={=time()}" />
 ```
 
+## 💻 로컬 개발 환경 설정
+
+### 필수 설치 항목
+- **Docker & Docker Compose**
+- **PHP 8.3+**
+- **Composer**
+- **Git**
+- **postcss** (CSS 빌드용)
+- **tersermin** (JavaScript 빌드용)
+
+### 로컬 개발 설정
+
+```bash
+# 1. /etc/hosts 설정
+echo "127.0.0.1 powderroom.service.east-1.test" >> /etc/hosts
+
+# 2. SSL 인증서 생성
+script/self-signed-cert.sh powderroom.service.east-1.test
+
+# 3. 의존성 설치
+composer install
+
+# 4. 에셋 빌드
+./script/build.sh
+```
+
+### 개발 서버 실행
+```bash
+# Docker Compose로 로컬 환경 실행
+docker-compose up -d
+
+# 또는 PHP 내장 서버 사용
+php -S localhost:8000 -t document/web
+```
+
 ## 🎯 프론트엔드 개발 시 주의사항
 
 1. **템플릿 문법**: PHP 템플릿 문법(`{=}`, `{?}`, `{@}`)을 정확히 사용해야 합니다.
@@ -479,6 +783,27 @@ document/web/assets/theme/powderroom/js/custom.js
 3. **테마 분리**: 테마별로 리소스가 분리되어 있으므로, 수정 시 올바른 테마 파일을 수정해야 합니다.
 4. **빌드 필수**: CSS/JS 파일을 수정한 후에는 반드시 빌드 스크립트를 실행해야 합니다.
 5. **jQuery 의존성**: 많은 코드가 jQuery에 의존하므로, 순수 JavaScript로 변경 시 주의가 필요합니다.
+6. **YAML 정의서 우선**: 데이터 구조 확인 시 ERD 대신 YAML 인터페이스 정의서를 참조하세요.
+7. **서버 사이드 렌더링**: 모든 HTML은 서버에서 생성되므로, 클라이언트 사이드 프레임워크(React, Vue)를 사용하지 않습니다.
+8. **Accept 헤더**: 응답 형태는 Accept 헤더와 Content-Type에 따라 HTML/JSON으로 결정됩니다.
+
+## 🏛️ 아키텍처 특징
+
+### 프로젝트 특징
+- **자체 개발 프레임워크**: PHP 기반 커스텀 프레임워크 사용
+- **모듈 기반 아키텍처**: 기능별 독립 모듈 구조
+- **YAML 인터페이스 정의**: 폼 정의 및 데이터 구조를 YAML로 관리
+- **정규식 라우팅**: rule.php 기반 유연한 URL 매핑
+- **커스텀 템플릿 엔진**: 자체 문법의 서버사이드 렌더링
+- **서버사이드 렌더링**: HTMX를 활용한 SPA-like 경험
+- **관리자 시스템**: Control 컨트롤러 기반 백오피스
+- **유연한 응답 형태**: Accept 헤더에 따라 HTML/JSON 응답 결정
+
+### 프론트엔드 아키텍처 특징
+- **렌더링 방식**: Server-Side Rendering (SSR)
+- **인터랙션**: HTMX를 통한 동적 컨텐츠 로딩
+- **API**: 별도 REST API 없이 서버 직접 통신
+- **에셋**: S3를 통한 정적 파일 서빙 (운영 환경)
 
 ## 🔗 관련 리소스
 
@@ -489,12 +814,12 @@ document/web/assets/theme/powderroom/js/custom.js
 ## 📚 추가 학습 자료
 
 프론트엔드 개발을 시작하려면 다음을 이해하는 것이 도움이 됩니다:
-- PHP 템플릿 시스템
-- HTMX 공식 문서: https://htmx.org/
-- Bootstrap 5 문서: https://getbootstrap.com/
-- jQuery API: https://api.jquery.com/
+- **PHP 템플릿 시스템**: 서버 사이드 템플릿 렌더링 개념
+- **HTMX 공식 문서**: https://htmx.org/ - 비동기 통신 및 부분 업데이트
+- **Bootstrap 5 문서**: https://getbootstrap.com/ - UI 컴포넌트 및 그리드 시스템
+- **jQuery API**: https://api.jquery.com/ - DOM 조작 및 이벤트 처리
+- **YAML 문법**: YAML 인터페이스 정의서 작성 시 필요
 
 ---
 
 **참고**: 이 프로젝트는 서버 사이드 렌더링 방식이므로, React나 Vue 같은 클라이언트 사이드 프레임워크를 사용하지 않습니다. 대신 HTMX를 활용하여 부분적 비동기 업데이트를 구현합니다.
-
